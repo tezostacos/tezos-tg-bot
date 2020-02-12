@@ -173,7 +173,7 @@ def get_gas_settings():
     gas_settings = ["--gas-limit", "20375", "--storage-limit", "70"]
     try:
         response = requests.get(constant_url).json()
-        gas_settings = ["--gas-limit", response['hard_gas_limit_per_operation'], "--storage-limit", response['hard_storage_limit_per_operation'], "--burn-cap", "0.257"]
+        gas_settings = ["--gas-limit", response['hard_gas_limit_per_operation'], "--storage-limit", response['hard_storage_limit_per_operation']]
         return gas_settings
     except Exception as exc:
         print(exc)
