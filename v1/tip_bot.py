@@ -127,8 +127,7 @@ def withdraw(bot, update):
             amount = str(amount)
             gas_settings = get_gas_settings()
             tx = subprocess.Popen([core, *node_settings, "transfer", amount, "from", user, "to", address, *gas_settings], stdout=subprocess.PIPE)
-           # print(tx, "\n", tx.stdout.strip())
-            bot.send_message(chat_id=update.message.chat_id, text="@{0} has successfully withdrew to address: {1} of {2} RDD" .format(user,address,amount))
+            bot.send_message(chat_id=update.message.chat_id, text="@{0} has successfully withdrew to address: {1} of {2} XTZ" .format(user,address,amount))
 
 
 def hi(bot, update):

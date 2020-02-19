@@ -1,0 +1,17 @@
+{
+    "mongo":
+    {
+      "connectionString": "mongodb://localhost:27017/tezosbot"
+    },
+    "telegram_bot":
+    {
+      "bot_token": ""
+    },
+    "constant_url": "https://teznode.letzbake.com/chains/main/blocks/head/context/constants",
+    "node_settings": ["-A", "teznode.letzbake.com", "-S", "-P", "443"],
+    "bot_username": "",
+    "greeting_msg": "<b>Welcome to the tip bot provided you by Tezos Tacos</b> 🌮 https://tezostacos.com\n<b>Remeber! Do not change your username!",
+    "contract": "",
+    "admin_secret": "",
+    "node_url": "https://rpc.tzkt.io/mainnet"
+}
