@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 
 import schedule
@@ -50,7 +51,7 @@ class TipBot:
 
         self.update_accounts()
         schedule.every(30).seconds.do(self.update_accounts)
-        self.pending_tasks()
+        threading.Thread(target=self.pending_tasks).start()
 
     def pending_tasks(self):
         while True:
