@@ -176,7 +176,7 @@ class TipBot:
         tzstats_data = self.c_stats.find_one({"_id": "tzstats"})
         cg_data = self.c_stats.find_one({"_id": "coingecko"})
 
-        text = "<b>Price:</b>: $%s (%s BTC)\n" \
+        text = "<b>Price:</b> $%s (%s BTC)\n" \
                "<b>Volume:</b> $%s\n" \
                "<b>Total Accounts:</b> %s\n" \
                "<b>30d Accounts:</b> %s\n" \
