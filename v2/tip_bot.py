@@ -43,14 +43,17 @@ class TipBot:
         client = MongoClient(connectionString)
         db = client.get_default_database()
         self.c_users = db['Users']
+        self.c_stats = db['Stats']
 
         self.bot = Bot(token=bot_token)
 
         pz = pytezos.using(shell=node_url, key=admin_secret)
         self.ci = pz.contract(contract_address)
 
+        self.update_stats()
         self.update_accounts()
         schedule.every(30).seconds.do(self.update_accounts)
+        schedule.every(1).minute.do(self.update_stats)
         threading.Thread(target=self.pending_tasks).start()
 
     def pending_tasks(self):
@@ -61,6 +64,61 @@ class TipBot:
             except Exception as exc:
                 print(exc)
                 time.sleep(5)
+
+    def update_stats(self):
+        self.update_tzstats()
+        self.update_cg_data()
+
+    def update_cg_data(self):
+        try:
+            response = requests.get("https://api.coingecko.com/api/v3/coins/tezos").json()
+
+            price_usd = '{0:,.2f}'.format(response['market_data']['current_price']['usd'])
+            price_btc = '{0:,.8f}'.format(response['market_data']['current_price']['btc'])
+            volume = '{0:,.2f}'.format(response['market_data']['total_volume']['usd'])
+
+            self.c_stats.update_one(
+                {"_id": "coingecko"},
+                {"$set": {
+                    "price_usd": price_usd,
+                    "price_btc": price_btc,
+                    "volume": volume,
+                }}, upsert=True
+            )
+        except Exception as exc:
+            print(exc)
+            traceback.print_exc()
+
+    def update_tzstats(self):
+        try:
+            response = requests.get("https://api.tzstats.com/explorer/tip").json()
+
+            total_accounts = response['total_accounts']
+            accounts_30d = response['new_accounts_30d']
+            active_bakers = response['roll_owners']
+            delegators = response['delegators']
+            total = int(response['supply']['total'])
+            staking = int(response['supply']['staking'])
+            unclaimed = int(response['supply']['unclaimed'])
+            circulating = int(response['supply']['circulating'])
+            staking_perc = "{0:.2f}".format(float(staking) / float(total) * 100)
+
+            self.c_stats.update_one(
+                {"_id": "tzstats"},
+                {"$set": {
+                    "total_accounts": total_accounts,
+                    "accounts_30d": accounts_30d,
+                    "active_bakers": active_bakers,
+                    "delegators": delegators,
+                    "staking": staking,
+                    "staking_perc": staking_perc,
+                    "unclaimed": unclaimed,
+                    "circulating": circulating
+                }}, upsert=True
+            )
+        except Exception as exc:
+            print(exc)
+            traceback.print_exc()
 
     def update_accounts(self):
         try:
@@ -85,7 +143,8 @@ class TipBot:
                     if float(last_balance) < float(str(storage['accounts'][_username])) and _user is not None:
                         self.bot.send_message(
                             chat_id=_user['_id'],
-                            text="<b>Your balance has been recharged. New balance is %s XTZ</b>" % storage['accounts'][_username],
+                            text="<b>Your balance has been recharged. New balance is %s XTZ</b>" % storage['accounts'][
+                                _username],
                             parse_mode='HTML'
                         )
                     elif float(last_balance) > float(str(storage['accounts'][_username])) and _user is not None:
@@ -114,17 +173,29 @@ class TipBot:
                          text="The following commands are at your disposal: /hi , /commands , /deposit , /tip , /withdraw , /price , /marketcap or /balance")
 
     def tacos(self, bot, update):
-        mc = requests.get("https://api.coingecko.com/api/v3/coins/tezos").json()
-        btc_price = requests.get(
-            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZBTC").json()[
-            'lastPrice']
-        usdt_price = requests.get(
-            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZUSDT").json()[
-            'lastPrice']
-        text = "<b>XTZBTC:</b> %s ฿\n<b>XTZUSDT:</b> %s USDT\n" % (
-            btc_price, usdt_price)
-        text += "The current market cap of Tezos is valued at ${0}\n".format(
-            "{:,.0f}".format(float(mc['market_data']['market_cap']['usd'])))
+        tzstats_data = self.c_stats.find_one({"_id": "tzstats"})
+        cg_data = self.c_stats.find_one({"_id": "coingecko"})
+
+        text = "<b>Price:</b>: $%s (%s BTC)\n" \
+               "<b>Volume:</b> $%s\n" \
+               "<b>Total Accounts:</b> %s\n" \
+               "<b>30d Accounts:</b> %s\n" \
+               "<b>Active Bakers:</b> %s\n" \
+               "<b>Delegators:</b> %s\n" \
+               "<b>Staking:</b> %s XTZ (%s%%)\n" \
+               "<b>Unclaimed:</b> %s XTZ\n" \
+               "<b>Circulating:</b> %s XTZ\n" % (
+                   cg_data['price_usd'], cg_data['price_btc'],
+                   cg_data['volume'],
+                   tzstats_data['total_accounts'],
+                   tzstats_data['accounts_30d'],
+                   tzstats_data['active_bakers'],
+                   tzstats_data['delegators'],
+                   tzstats_data['staking'],
+                   tzstats_data['staking_perc'],
+                   tzstats_data['unclaimed'],
+                   tzstats_data['circulating']
+               )
 
         bot.send_message(
             chat_id=update.message.chat_id,
@@ -154,8 +225,6 @@ class TipBot:
             elif "@" in target:
                 target = target[1:]
                 storage = self.ci.storage()
-                if target not in str(list(storage['accounts'].keys())):
-                    self._add_account(target, 0)
 
                 _user = self.c_users.find_one({"username": user})
                 balance = float(_user['balance'])
@@ -175,10 +244,6 @@ class TipBot:
                         bot.send_message(
                             chat_id=update.message.chat_id,
                             text="You're successfully sent a tip to @{0} with {1} XTZ".format(target, amount))
-                    else:
-                        bot.send_message(
-                            chat_id=update.message.chat_id,
-                            text="Please, wait until @{0} will be confirmed in the contract".format(target))
             else:
                 bot.send_message(
                     chat_id=update.message.chat_id,
@@ -190,15 +255,23 @@ class TipBot:
             _user = self.c_users.find_one({"username": user})
             bot.send_message(
                 chat_id=update.message.chat_id,
-                text="@{0} your current balance is: {1}".format(user, _user['balance']))
+                text="@{0} your current balance is: {1}. Powered by <a href='https://tezostacos.com'>Tezos Tacos</a> 🌮".format(user, _user['balance']),
+                disable_web_page_preview=True,
+                parse_mode='HTML'
+            )
+        else:
+            bot.send_message(
+                chat_id=update.message.chat_id,
+                text="@{0} your current balance is: {1}. Powered by <a href='https://tezostacos.com'>Tezos Tacos</a> 🌮".format(user, 0),
+                disable_web_page_preview=True,
+                parse_mode='HTML'
+            )
 
     def price(self, bot, update):
         btc_price = requests.get(
-            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZBTC").json()[
-            'lastPrice']
+            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZBTC").json()['lastPrice']
         usdt_price = requests.get(
-            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZUSDT").json()[
-            'lastPrice']
+            "https://www.binance.com/api/v3/ticker/24hr?symbol=XTZUSDT").json()['lastPrice']
         bot.send_message(chat_id=update.message.chat_id,
                          text="<b>XTZBTC:</b> %s ฿\n<b>XTZUSDT:</b> %s USDT\n" % (
                              btc_price, usdt_price),
@@ -337,9 +410,6 @@ class TipBot:
             print(exc)
 
 
-# Deposit
-# res = ci.deposit('v').with_amount(Decimal('0.01')).operation_group.autofill().sign().inject()
-# print(res)
 
 if __name__ == '__main__':
     tip_bot_obj = TipBot()
