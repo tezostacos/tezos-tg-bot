@@ -1,6 +1,6 @@
 # Tezos Tacos Tipbot
 
-Hello Tezos amigos! Tezos Tacos wanted to contribute in a fun way, so we made an open source Telegram Tipbot. It is decentralized using the KT18jF2bCerNgrkyk7qd1Bpk9gKnpPKJAvjB smart contract.
+Hello Tezos amigos! Tezos Tacos wanted to contribute in a fun way, so we made an open source Telegram Tipbot. It is built using the KT18jF2bCerNgrkyk7qd1Bpk9gKnpPKJAvjB smart contract.
 
 The bot interacts with the smart contract using pytezos. You can check all methods in the [Better Call Dev explorer](https://better-call.dev/main/KT18jF2bCerNgrkyk7qd1Bpk9gKnpPKJAvjB/operations) and research the code right there. To deposit XTZ to the Tezos Tacos Tipbot, use the "deposit" entrypoint with a string argument. All funds are stored in the smart contract with your Telegram username.
 
